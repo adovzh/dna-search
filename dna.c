@@ -5,6 +5,10 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+// #define DNA_DEBUG
+#define ALGO_BRUTE_FORCE
+// #define ALGO_KMP
+
 typedef unsigned int bufindex_t;
 typedef int buflen_t;
 typedef void (*P_LISTENER)(bufindex_t);
@@ -13,6 +17,7 @@ typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENE
 char *needle = "GCAACGAGTGTCTTTG";
 int needle_len;
 
+#ifdef ALGO_BRUTE_FORCE
 void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
 	char *p;
 	buflen_t countdown = len;
@@ -21,7 +26,9 @@ void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset
 		if (!memcmp(p, needle, needle_len))
 			listener(len - countdown + offset);
 }
+#endif
 
+#ifdef ALGO_KMP
 char *prefix;
 void prepare_prefix(char*);
 
@@ -40,10 +47,9 @@ void prepare_prefix(char *pi) {
 	pi[0] = 0;
 
 	for (k = 0, q = 1; q < needle_len; q++) {
-		while (k > 0 && needle[k] != needle[q]) k = pi[q];
+		while (k > 0 && needle[k] != needle[q]) k = pi[k - 1];
 		if (needle[k] == needle[q]) k++;
 		pi[q] = k;
-		printf("pi[%d] = %d\n", q, k);
 	}
 }
 
@@ -52,15 +58,16 @@ void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LIST
 	buflen_t q, i;
 
 	for (q = 0, i = 0; i < len; i++, cur++) {
-		while (q > 0 && needle[q] != *cur) q = prefix[q];
+		while (q > 0 && needle[q] != *cur) q = prefix[q - 1];
 		if (needle[q] == *cur) q++;
 		if (q == needle_len) {
-			printf("kmp found: ");
 			listener(i - needle_len + 1 + offset);
-			q = prefix[q];
+			q = prefix[q - 1];
 		}
 	}
 }
+
+#endif
 
 void print_current_time(struct timeval *tv) {
 	struct tm time_tm;
@@ -77,7 +84,7 @@ void print_elapsed_time(struct timeval *start_time, struct timeval *end_time) {
 	int millis = (end_time->tv_usec - start_time->tv_usec) / 1000;
 	if (millis < 0) {
 		seconds--;
-		millis = 1000 - millis;
+		millis += 1000;
 	}
 	printf("Elapsed: %d.%03d\n", seconds, millis);
 }
@@ -152,10 +159,15 @@ void wait_jobs_completed() {
 	pthread_mutex_unlock(&jobs_completed_lock);
 }
 
+#ifdef ALGO_BRUTE_FORCE
 P_SEARCH_ALGO search = brute_force;
-// P_SEARCH_ALGO search = kmp;
+#endif
 
-#define THREAD_NUM 17 
+#ifdef ALGO_KMP
+P_SEARCH_ALGO search = kmp;
+#endif
+
+#define THREAD_NUM 17
 
 pthread_t threads[THREAD_NUM];
 
@@ -201,37 +213,29 @@ int main() {
 	printf(" START\n");
 
 	bufindex_t input_size = 3000000000L;
-	buflen_t buf_size = 500000;
-	// long buf_size = input_size;
+	buflen_t buf_size = 1000000;
+	
 	needle_len = strlen(needle);
 
 	init_threads();
 
-	// prepare_kmp();
+#ifdef ALGO_KMP	
+	prepare_kmp();
+#endif
 
-	// long mem_time = 0, working_time = 0;
+#ifdef DNA_DEBUG
 	long io_time, waiting_time;
-	struct timeval tx, ty, tz;
-	// gettimeofday(&tx, NULL);
-	bufindex_t start;
-	
+	struct timeval tx, ty, tz;	
 	print_current_time(&tx);
 	printf(" Start reading data\n");
+#endif
 
+	bufindex_t start;
 	for (start = 0; start < input_size; start += buf_size) {
-		// printf("Allocating %d starting from %u\n", buf_size + needle_len, start);
-		// struct timeval st, et, at, at2;
-		// gettimeofday(&st, NULL);
-
 		char *buf = malloc(buf_size + needle_len);
 		buflen_t bytes_read = fread(buf, 1, buf_size + needle_len, stdin);
-		// printf("%ld bytes read\n", bytes_read);
-
-		// gettimeofday(&et, NULL);
-		// mem_time += calc_elapsed_time(&st, &et);
 
 		if (bytes_read) {
-			// search(buf, 0, bytes_read, start, found_handler);
 			job_t *job = malloc(sizeof(job_t));
 			job->buf = buf;
 			job->len = bytes_read;
@@ -241,36 +245,38 @@ int main() {
 		else
 			printf("ERROR\n");
 
-		// gettimeofday(&at, NULL);
-		// working_time += calc_elapsed_time(&et, &at);
-		
 		buflen_t rollback = buf_size - bytes_read;
+
 		if (rollback < 0)
 			fseek(stdin, -needle_len, SEEK_CUR);
-		// free(buf);
-		// gettimeofday(&at2, NULL);
-		// mem_time += calc_elapsed_time(&at, &at2);
 	}
 
-	// gettimeofday(&ty, NULL);
+#ifdef DNA_DEBUG	
 	print_current_time(&ty);
 	printf(" End submitting jobs\n");
 	io_time = calc_elapsed_time(&tx, &ty);
+#endif
 
 	wait_jobs_completed();
 
+#ifdef DNA_DEBUG
 	gettimeofday(&tz, NULL);
 	waiting_time = calc_elapsed_time(&ty, &tz);
+#endif
 
 	destroy_threads();
 
-	// free_kmp();
+#ifdef ALGO_KMP	
+	free_kmp();
+#endif
 
 	struct timeval end_time;
 	print_current_time(&end_time);
 	printf(" FINISH\n");
 
+#ifdef DNA_DEBUG
 	print_elapsed_time(&start_time, &end_time);
 	printf("I/O: %ld\n", io_time);
 	printf("Waiting: %ld\n", waiting_time);
+#endif
 }
