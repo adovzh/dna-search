@@ -10,15 +10,14 @@ typedef int buflen_t;
 typedef void (*P_LISTENER)(bufindex_t);
 typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENER);
 
-char *needle = "GCAACGAGTGTCTTTG"; /* "CATGTAACTCA"; */
-// char *needle = "GTCGCGTACCTGTGGT";
+char *needle = "GCAACGAGTGTCTTTG";
 int needle_len;
 
 void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
-	// int needle_len = strlen(needle);
+	char *p;
 	buflen_t countdown = len;
 
-	for (char *p = buffer + start; countdown; p++, countdown--) 
+	for (p = buffer + start; countdown; p++, countdown--) 
 		if (!memcmp(p, needle, needle_len))
 			listener(len - countdown + offset);
 }
@@ -36,21 +35,23 @@ void free_kmp() {
 }
 
 void prepare_prefix(char *pi) {
+	int k, q;
+
 	pi[0] = 0;
 
-	for (int k = 0, q = 1; q < needle_len; q++) {
+	for (k = 0, q = 1; q < needle_len; q++) {
 		while (k > 0 && needle[k] != needle[q]) k = pi[q];
 		if (needle[k] == needle[q]) k++;
 		pi[q] = k;
+		printf("pi[%d] = %d\n", q, k);
 	}
 }
 
 void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
-	// int needle_len = strlen(needle);
 	char *cur = buffer + start;
+	buflen_t q, i;
 
-	for (buflen_t q = 0, i = 0; i < len; i++, cur++) {
-		// while (q > 0 && needle[q] != buffer[start + i]) q = prefix[q];
+	for (q = 0, i = 0; i < len; i++, cur++) {
 		while (q > 0 && needle[q] != *cur) q = prefix[q];
 		if (needle[q] == *cur) q++;
 		if (q == needle_len) {
@@ -93,7 +94,7 @@ void found_handler(bufindex_t pos) {
 
 #define MAX_JOB_QUEUE 6000
 
-typedef struct {
+typedef struct _job_t {
 	char *buf;
 	buflen_t len; 
 	bufindex_t offset;
@@ -143,7 +144,7 @@ void wait_jobs_completed() {
    	timeout.tv_nsec = 0;
 
 	pthread_mutex_lock(&jobs_completed_lock);
-	while (!errorno && jobs_posted != jobs_completed)
+	while (!errorno && jobs_posted > jobs_completed)
 		errorno = pthread_cond_timedwait(&jobs_completed_cond, &jobs_completed_lock, &timeout);
 	if (errorno){
 		printf("Timed wait: %d, %s\n", errorno, strerror(errorno));
@@ -154,7 +155,7 @@ void wait_jobs_completed() {
 P_SEARCH_ALGO search = brute_force;
 // P_SEARCH_ALGO search = kmp;
 
-#define THREAD_NUM 20 
+#define THREAD_NUM 17 
 
 pthread_t threads[THREAD_NUM];
 
@@ -169,19 +170,25 @@ void *handle_job(void *arg) {
 }
 
 void init_threads() {
+	int i;
+	pthread_t *p = threads;
+
 	pthread_mutex_init(&queue_lock, NULL);
 	pthread_cond_init(&read_cond, NULL);
 	pthread_mutex_init(&jobs_completed_lock, NULL);
 	pthread_cond_init(&jobs_completed_cond, NULL);
-	pthread_t *p = threads;
-	for (int i = 0; i < THREAD_NUM; i++, p++)
+
+	for (i = 0; i < THREAD_NUM; i++, p++)
 		pthread_create(p, NULL, handle_job, NULL);
 }
 
 void destroy_threads() {
+	int i;
 	pthread_t *p = threads;
-	for (int i = 0; i < THREAD_NUM; i++, p++)
+
+	for (i = 0; i < THREAD_NUM; i++, p++)
 		pthread_cancel(*p);
+
 	pthread_cond_destroy(&jobs_completed_cond);
 	pthread_mutex_destroy(&jobs_completed_lock);
 	pthread_cond_destroy(&read_cond);
@@ -200,12 +207,19 @@ int main() {
 
 	init_threads();
 
-	prepare_kmp();
+	// prepare_kmp();
 
 	// long mem_time = 0, working_time = 0;
+	long io_time, waiting_time;
+	struct timeval tx, ty, tz;
+	// gettimeofday(&tx, NULL);
+	bufindex_t start;
 	
-	for (bufindex_t start = 0; start < input_size; start += buf_size) {
-		// printf("Allocating %ld starting from %ld\n", buf_size + needle_len, start);
+	print_current_time(&tx);
+	printf(" Start reading data\n");
+
+	for (start = 0; start < input_size; start += buf_size) {
+		// printf("Allocating %d starting from %u\n", buf_size + needle_len, start);
 		// struct timeval st, et, at, at2;
 		// gettimeofday(&st, NULL);
 
@@ -218,7 +232,7 @@ int main() {
 
 		if (bytes_read) {
 			// search(buf, 0, bytes_read, start, found_handler);
-			job_t *job = malloc(sizeof job);
+			job_t *job = malloc(sizeof(job_t));
 			job->buf = buf;
 			job->len = bytes_read;
 			job->offset = start;
@@ -238,16 +252,25 @@ int main() {
 		// mem_time += calc_elapsed_time(&at, &at2);
 	}
 
+	// gettimeofday(&ty, NULL);
+	print_current_time(&ty);
+	printf(" End submitting jobs\n");
+	io_time = calc_elapsed_time(&tx, &ty);
+
 	wait_jobs_completed();
+
+	gettimeofday(&tz, NULL);
+	waiting_time = calc_elapsed_time(&ty, &tz);
+
 	destroy_threads();
 
-	free_kmp();
+	// free_kmp();
 
 	struct timeval end_time;
 	print_current_time(&end_time);
 	printf(" FINISH\n");
 
 	print_elapsed_time(&start_time, &end_time);
-	// printf("I/O: %ld\n", mem_time);
-	// printf("CPU: %ld\n", working_time);
+	printf("I/O: %ld\n", io_time);
+	printf("Waiting: %ld\n", waiting_time);
 }
