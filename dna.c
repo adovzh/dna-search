@@ -14,14 +14,19 @@ typedef int buflen_t;
 typedef void (*P_LISTENER)(bufindex_t);
 typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENER);
 
-char *needle = "GCAACGAGTGTCTTTG";
+char *needle; 
 int needle_len;
+
+void init_needle(char *s) {
+	needle = s;
+	needle_len = strlen(s);
+}
 
 #ifdef ALGO_BRUTE_FORCE
 void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
 	char *p;
 	buflen_t countdown = len;
-
+	
 	for (p = buffer + start; countdown; p++, countdown--) 
 		if (!memcmp(p, needle, needle_len))
 			listener(len - countdown + offset);
@@ -207,16 +212,19 @@ void destroy_threads() {
 	pthread_mutex_destroy(&queue_lock);
 }
 
-int main() {
+int main(int argc, char **argv) {
+	init_needle(argc > 1 ? argv[1] : "GCAACGAGTGTCTTTG");	
+#ifdef DNA_DEBUG
+	printf("Looking for %s\n", needle);
+#endif
+
 	struct timeval start_time;
 	print_current_time(&start_time);
 	printf(" START\n");
 
 	bufindex_t input_size = 3000000000L;
-	buflen_t buf_size = 1000000;
-	
-	needle_len = strlen(needle);
-
+	buflen_t buf_size = 500000;
+		
 	init_threads();
 
 #ifdef ALGO_KMP	
@@ -233,7 +241,7 @@ int main() {
 	bufindex_t start;
 	for (start = 0; start < input_size; start += buf_size) {
 		char *buf = malloc(buf_size + needle_len);
-		buflen_t bytes_read = fread(buf, 1, buf_size + needle_len, stdin);
+		buflen_t bytes_read = fread(buf, 1, buf_size + needle_len - 1, stdin);
 
 		if (bytes_read) {
 			job_t *job = malloc(sizeof(job_t));
@@ -248,7 +256,7 @@ int main() {
 		buflen_t rollback = buf_size - bytes_read;
 
 		if (rollback < 0)
-			fseek(stdin, -needle_len, SEEK_CUR);
+			fseek(stdin, rollback, SEEK_CUR);
 	}
 
 #ifdef DNA_DEBUG	
