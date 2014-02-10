@@ -1,78 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/time.h>
 #include <pthread.h>
 
-// #define DNA_DEBUG
-#define ALGO_BRUTE_FORCE
-// #define ALGO_KMP
-
-typedef unsigned int bufindex_t;
-typedef int buflen_t;
-typedef void (*P_LISTENER)(bufindex_t);
-typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENER);
-
-char *needle; 
-int needle_len;
-
-void init_needle(char *s) {
-	needle = s;
-	needle_len = strlen(s);
-}
-
-#ifdef ALGO_BRUTE_FORCE
-void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
-	char *p;
-	buflen_t countdown = len;
-	
-	for (p = buffer + start; countdown; p++, countdown--) 
-		if (!memcmp(p, needle, needle_len))
-			listener(len - countdown + offset);
-}
-#endif
-
-#ifdef ALGO_KMP
-char *prefix;
-void prepare_prefix(char*);
-
-void prepare_kmp() {
-	prefix = malloc(needle_len);
-	prepare_prefix(prefix);
-}
-
-void free_kmp() {
-	free(prefix);
-}
-
-void prepare_prefix(char *pi) {
-	int k, q;
-
-	pi[0] = 0;
-
-	for (k = 0, q = 1; q < needle_len; q++) {
-		while (k > 0 && needle[k] != needle[q]) k = pi[k - 1];
-		if (needle[k] == needle[q]) k++;
-		pi[q] = k;
-	}
-}
-
-void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
-	char *cur = buffer + start;
-	buflen_t q, i;
-
-	for (q = 0, i = 0; i < len; i++, cur++) {
-		while (q > 0 && needle[q] != *cur) q = prefix[q - 1];
-		if (needle[q] == *cur) q++;
-		if (q == needle_len) {
-			listener(i - needle_len + 1 + offset);
-			q = prefix[q - 1];
-		}
-	}
-}
-
-#endif
+#include "algo.h"
+#include "needle.h"
 
 void print_current_time(struct timeval *tv) {
 	struct tm time_tm;
@@ -163,14 +96,6 @@ void wait_jobs_completed() {
 	}
 	pthread_mutex_unlock(&jobs_completed_lock);
 }
-
-#ifdef ALGO_BRUTE_FORCE
-P_SEARCH_ALGO search = brute_force;
-#endif
-
-#ifdef ALGO_KMP
-P_SEARCH_ALGO search = kmp;
-#endif
 
 #define THREAD_NUM 17
 
