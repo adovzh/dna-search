@@ -11,10 +11,11 @@ int main(int argc, char **argv) {
 	int alpha_len = strlen(alphabet);
 	long bound = INPUT_SIZE;
 	unsigned seed = argc > 1 ? atoi(argv[1]) : DEFAULT_SEED;
+	long i;
 
 	srandom(seed);
 
-	for (long i = 0; i < bound; i++) 
+	for (i = 0; i < bound; i++) 
 		putchar(alphabet[random() % alpha_len]);
 
 	return 0;

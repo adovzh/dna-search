@@ -85,4 +85,6 @@ int main(int argc, char **argv) {
 	printf("I/O: %ld\n", io_time);
 	printf("Waiting: %ld\n", waiting_time);
 #endif
+
+	return 0;
 }

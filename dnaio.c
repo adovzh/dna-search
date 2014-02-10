@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/time.h>
+#include <time.h>
 #include "algo.h"
 
 void print_current_time(struct timeval *tv) {
