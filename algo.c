@@ -16,6 +16,8 @@ P_SEARCH_ALGO search = brute_force;
 #endif
 
 #ifdef ALGO_KMP
+#include <stdlib.h>
+
 static char *prefix;
 
 void prepare_kmp() {
@@ -40,12 +42,12 @@ void prepare_prefix(char *pi) {
 }
 
 void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
-	char *cur = buffer + start;
+	char *p = buffer + start;
 	buflen_t q, i;
 
-	for (q = 0, i = 0; i < len; i++, cur++) {
-		while (q > 0 && needle[q] != *cur) q = prefix[q - 1];
-		if (needle[q] == *cur) q++;
+	for (q = 0, i = 0; i < len; i++, p++) {
+		while (q > 0 && needle[q] != *p) q = prefix[q - 1];
+		if (needle[q] == *p) q++;
 		if (q == needle_len) {
 			listener(i - needle_len + 1 + offset);
 			q = prefix[q - 1];

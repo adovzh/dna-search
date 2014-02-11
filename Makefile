@@ -1,5 +1,6 @@
 CC=gcc
-override CFLAGS+=-c -Wall -DALGO_BRUTE_FORCE
+ALGO ?= BRUTE_FORCE
+override CFLAGS += -c -Wall -DALGO_$(ALGO)
 LDFLAGS=-lpthread
 
 all: dna
