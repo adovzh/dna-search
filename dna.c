@@ -3,12 +3,18 @@
 #include <string.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 
 #include "algo.h"
 #include "needle.h"
 #include "dnaio.h"
 #include "job.h"
 #include "thread.h"
+
+#define ERROR_OCCURRED(s) { perror(s); exit(EXIT_FAILURE); }
+#define ASSERT_NOT(cond,msg) if ((cond)) { printf("%s\n", (msg)); exit(EXIT_FAILURE); }
 
 int main(int argc, char **argv) {
 	init_needle(argc > 1 ? argv[1] : "GCAACGAGTGTCTTTG");	
@@ -21,8 +27,17 @@ int main(int argc, char **argv) {
 	printf(" START\n");
 
 	bufindex_t input_size = 3000000000L;
-	buflen_t buf_size = 500000;
-		
+	size_t page_size = sysconf(_SC_PAGESIZE);
+	ASSERT_NOT(page_size & (page_size - 1), "Page is not a power of 2");
+
+	size_t mask = page_size - 1;
+	size_t mem_size = (input_size | mask) + 1;
+	buflen_t buf_size = page_size << 14;
+
+#ifdef DNA_DEBUG
+	printf("Buf size = %u\n", buf_size);;
+#endif
+
 	init_threads();
 
 #ifdef ALGO_KMP	
@@ -36,25 +51,23 @@ int main(int argc, char **argv) {
 	printf(" Start reading data\n");
 #endif
 
+	int fd = 0;
+	if (argc > 2 && (fd = open(argv[2], O_RDONLY)) == -1) ERROR_OCCURRED("open");
+	char *mapped_file = mmap(NULL, mem_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (fd > 0 && close(fd) == -1) ERROR_OCCURRED("close");
+	char *buf;
+
 	bufindex_t start;
-	for (start = 0; start < input_size; start += buf_size) {
-		char *buf = malloc(buf_size + needle_len);
-		buflen_t bytes_read = fread(buf, 1, buf_size + needle_len - 1, stdin);
+	buflen_t bytes_read;
+	buflen_t len = buf_size + needle_len - 1;
 
-		if (bytes_read) {
-			job_t *job = malloc(sizeof(job_t));
-			job->buf = buf;
-			job->len = bytes_read;
-			job->offset = start;
-			submit_job(job);
-		}
-		else
-			printf("ERROR\n");
-
-		buflen_t rollback = buf_size - bytes_read;
-
-		if (rollback < 0)
-			fseek(stdin, rollback, SEEK_CUR);
+	for (start = 0, buf = mapped_file; start < input_size; start += buf_size, buf += buf_size) {
+		bytes_read = (start + len < input_size) ? len : input_size - start;
+		job_t *job = malloc(sizeof(job_t));
+		job->buf = buf;
+		job->len = bytes_read;
+		job->offset = start;
+		submit_job(job);
 	}
 
 #ifdef DNA_DEBUG	
@@ -64,6 +77,7 @@ int main(int argc, char **argv) {
 #endif
 
 	wait_jobs_completed();
+	munmap(mapped_file, mem_size);
 
 #ifdef DNA_DEBUG
 	gettimeofday(&tz, NULL);

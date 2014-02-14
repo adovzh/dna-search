@@ -1,9 +1,9 @@
 CC=gcc
 ALGO ?= BRUTE_FORCE
-override CFLAGS += -c -Wall -DALGO_$(ALGO)
+override CFLAGS += -c -Ofast -Wall -DALGO_$(ALGO)
 LDFLAGS=-lpthread
 
-all: dna
+all: dna gendna
 
 dna: dna.o algo.o needle.o dnaio.o job.o thread.o
 	$(CC) $(LDFLAGS) dna.o algo.o needle.o dnaio.o job.o thread.o -o dna

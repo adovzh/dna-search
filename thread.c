@@ -13,7 +13,6 @@ void *handle_job(void *arg) {
 	while (1) {
 		job_t *job = request_job();
 		search(job->buf, 0, job->len, job->offset, found_handler);
-		free(job->buf);
 		free(job);
 		complete_job();
 	}
