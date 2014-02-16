@@ -3,3 +3,5 @@ gendna
 *.o
 input.txt*
 .DS_Store
+*.pem
+
