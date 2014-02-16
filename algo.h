@@ -25,8 +25,11 @@ void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LIST
 
 #ifdef ALGO_BM
 #define ALGO_PREPARE prepare_bm();
-#define ALGO_FREE ;
+#define ALGO_FREE free_bm();
 void prepare_bm();
+void prepare_bad_char();
+void prepare_good_suffix();
+void free_bm();
 void boyer_moore(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener);
 #endif
 #endif

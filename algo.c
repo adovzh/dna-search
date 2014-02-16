@@ -60,55 +60,90 @@ P_SEARCH_ALGO search = kmp;
 
 #ifdef ALGO_BM
 #include <stdlib.h>
+#include <stdio.h>
 #define ALPHA_LEN 128
 
-static int good_suffix[ALPHA_LEN];
+static int bad_char[ALPHA_LEN];
+static int *good_suffix;
 static char *needle_last;
 
 void prepare_bm() {
-	char *p;
-	int count;
-
 	needle_last = needle + needle_len - 1;
-	// good_suffix = calloc(128, sizeof(int));
-	bzero(good_suffix, ALPHA_LEN * sizeof(int));
-	for (p = needle_last + 1, count = 0; p-- != needle; count++)
-		good_suffix[*p] = count;
+	prepare_bad_char();
+	prepare_good_suffix();
+}
+
+void prepare_bad_char() {
+	int i;
+	for (i = 0; i < ALPHA_LEN; i++) bad_char[i] = needle_len;
+	for (i = 0; i < needle_len - 1; i++) bad_char[(int)needle[i]] = needle_len - 1 - i;
+}
+
+#define max(a, b) ((a < b) ? (b) : (a))
+
+int is_prefix(char *word, int wordlen, int pos) {
+	char *s = word + pos;
+	char *limit = word + (wordlen - pos);
+	while (word != limit)
+		if (*word++ != *s++)
+			return 0;
+	return 1;
+}
+
+int suffix_length(char *word, int wordlen, int pos) {
+	int i;
+	char *p = word + pos;
+	char *q = word + wordlen;
+
+	for (i = 0; *p-- == *--q && i < pos; i++);
+	return i;
+	/*
+	int i;
+	for (i = 0; word[pos - i] == word[wordlen - 1 - i] && i < pos; i++);
+	return i;
+	*/
+}
+
+void prepare_good_suffix() {
+	int p;
+	int last_prefix_index = needle_len - 1;
+
+	good_suffix = malloc(needle_len * sizeof(int));
+
+	for (p = needle_len - 1; p >=0; p--) {
+		if (is_prefix(needle, needle_len, p + 1))
+			last_prefix_index = p + 1;
+		good_suffix[p] = last_prefix_index + (needle_len - 1 - p);
+	}
+
+	for (p = 0; p < needle_len - 1; p++) {
+		int slen = suffix_length(needle, needle_len, p);
+		if (needle[p - slen] != needle[needle_len - 1 - slen])
+			good_suffix[needle_len - 1 - slen] = needle_len - 1 - p + slen;
+	}
+}
+
+void free_bm() {
+	free(good_suffix);
 }
 
 void boyer_moore(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
+	int i = needle_len - 1;
 	char *p = buffer + start;
-	char *plast, *nlast;
-	int countdown = len;
-	int prefix_matched_len;
-	int bad_count;
-	int shift;
 
-	while (countdown > 0) {
-		prefix_matched_len = 0;
-		bad_count = needle_len;
-		plast = p + needle_len - 1;
-		nlast = needle_last;
-
-		while (*plast == *nlast) {
-			bad_count--;
-			prefix_matched_len++;
-			plast--;
-			nlast--;
-			if (prefix_matched_len == needle_len)
-				listener(p - buffer + offset);
+	while (i < len) {
+		int j = needle_len - 1;
+		while (j >= 0 && p[i] == needle[j]) {
+			--i;
+			--j;
 		}
 
-		if (!good_suffix[*plast])
-			shift = bad_count;
-		else {
-			shift = good_suffix[*plast];
-			shift = (shift - prefix_matched_len < 1) ? 1 : shift - prefix_matched_len;
-		}
-
-		p += shift;
-		countdown -= shift;
-	}	
+		if (j < 0) {
+			listener(i + 1 + offset);
+			i+=good_suffix[0] + 1;
+		} else {
+			i += max(bad_char[(int)p[i]], good_suffix[j]); }
+	}
 }
 
 P_SEARCH_ALGO search = boyer_moore;
