@@ -2,7 +2,7 @@
 #define __ALGO_H
 
 typedef unsigned int bufindex_t;
-typedef int buflen_t;
+typedef unsigned int buflen_t;
 typedef void (*P_LISTENER)(bufindex_t);
 typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENER);
 
