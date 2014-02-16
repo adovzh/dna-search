@@ -12,15 +12,15 @@ To build and generate an 3,000,000,000 byte input file:
 To build and run main program:
 
     $ make
-    $ ./dna TTTTTATGGTAAGTAT < input.txt
+    $ ./dna TTTTTATGGTAAGTAT input.txt
 
 The output should be something like this:
 
-    Feb11 13:31:39.045 START
-    Feb11 13:31:47.680 FOUND SEQUENCE STARTING AT 2600528088
-    Feb11 13:31:48.917 FOUND SEQUENCE STARTING AT 2999999984
-    Feb11 13:31:48.917 FINISH
+	Feb16 23:28:58.037 START
+	Feb16 23:28:59.547 FOUND SEQUENCE STARTING AT 2999999984
+	Feb16 23:28:59.572 FOUND SEQUENCE STARTING AT 2600528088
+	Feb16 23:28:59.715 FINISH
 
 To recompile with an alternative algorithm issue:
 
-    $ make clean all ALGO=KMP
+    $ make clean all ALGO=BM
