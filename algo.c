@@ -58,3 +58,58 @@ void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LIST
 P_SEARCH_ALGO search = kmp;
 #endif
 
+#ifdef ALGO_BM
+#include <stdlib.h>
+#define ALPHA_LEN 128
+
+static int good_suffix[ALPHA_LEN];
+static char *needle_last;
+
+void prepare_bm() {
+	char *p;
+	int count;
+
+	needle_last = needle + needle_len - 1;
+	// good_suffix = calloc(128, sizeof(int));
+	bzero(good_suffix, ALPHA_LEN * sizeof(int));
+	for (p = needle_last + 1, count = 0; p-- != needle; count++)
+		good_suffix[*p] = count;
+}
+
+void boyer_moore(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener) {
+	char *p = buffer + start;
+	char *plast, *nlast;
+	int countdown = len;
+	int prefix_matched_len;
+	int bad_count;
+	int shift;
+
+	while (countdown > 0) {
+		prefix_matched_len = 0;
+		bad_count = needle_len;
+		plast = p + needle_len - 1;
+		nlast = needle_last;
+
+		while (*plast == *nlast) {
+			bad_count--;
+			prefix_matched_len++;
+			plast--;
+			nlast--;
+			if (prefix_matched_len == needle_len)
+				listener(p - buffer + offset);
+		}
+
+		if (!good_suffix[*plast])
+			shift = bad_count;
+		else {
+			shift = good_suffix[*plast];
+			shift = (shift - prefix_matched_len < 1) ? 1 : shift - prefix_matched_len;
+		}
+
+		p += shift;
+		countdown -= shift;
+	}	
+}
+
+P_SEARCH_ALGO search = boyer_moore;
+#endif

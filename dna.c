@@ -40,9 +40,7 @@ int main(int argc, char **argv) {
 
 	init_threads();
 
-#ifdef ALGO_KMP	
-	prepare_kmp();
-#endif
+	ALGO_PREPARE
 
 #ifdef DNA_DEBUG
 	long io_time, waiting_time;
@@ -86,9 +84,7 @@ int main(int argc, char **argv) {
 
 	destroy_threads();
 
-#ifdef ALGO_KMP	
-	free_kmp();
-#endif
+	ALGO_FREE
 
 	struct timeval end_time;
 	print_current_time(&end_time);

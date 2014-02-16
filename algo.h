@@ -9,14 +9,24 @@ typedef void (*P_SEARCH_ALGO)(char*, bufindex_t, buflen_t, bufindex_t, P_LISTENE
 extern P_SEARCH_ALGO search;
 
 #ifdef ALGO_BRUTE_FORCE
+#define ALGO_PREPARE ;
+#define ALGO_FREE ;
 void brute_force(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener); 
 #endif
 
 #ifdef ALGO_KMP
+#define ALGO_PREPARE prepare_kmp();
+#define ALGO_FREE free_kmp();
 void prepare_kmp();
 void free_kmp();
 void prepare_prefix(char *pi);
 void kmp(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener); 
 #endif
 
+#ifdef ALGO_BM
+#define ALGO_PREPARE prepare_bm();
+#define ALGO_FREE ;
+void prepare_bm();
+void boyer_moore(char *buffer, bufindex_t start, buflen_t len, bufindex_t offset, P_LISTENER listener);
+#endif
 #endif
