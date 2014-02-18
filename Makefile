@@ -1,7 +1,7 @@
 CC=gcc
 ALGO ?= BRUTE_FORCE
 override CFLAGS += -c -Ofast -Wall -DALGO_$(ALGO)
-LDFLAGS=-lpthread
+LDFLAGS=-lpthread -pthread
 
 all: dna gendna
 
